@@ -1,7 +1,7 @@
 import streamlit as st
 from models.bayes_network import predict_overload
 
-st.header("🤖 Chẩn đoán & Dự báo Ách tắc")
+st.header("🤖 Chẩn đoán và Dự báo Ách tắc")
 st.write("Công cụ ứng dụng Xác suất Bayes để dự báo nguy cơ trễ hẹn hồ sơ dựa trên các tham số đầu vào.")
 
 # Tạo form nhập liệu cho cán bộ
