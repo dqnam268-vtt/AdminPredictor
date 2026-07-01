@@ -1,41 +1,51 @@
 import streamlit as st
 from models.bayes_network import predict_overload
 
-st.header("🤖 Chẩn đoán và Dự báo Ách tắc")
-st.write("Công cụ ứng dụng Xác suất Bayes để dự báo nguy cơ trễ hẹn hồ sơ dựa trên các tham số đầu vào.")
+st.header("🤖 Chẩn đoán & Dự báo Ách tắc (Bản Tổng quát)")
+st.write("Công cụ ứng dụng mạng Xác suất Bayes để chẩn đoán nguy cơ trễ hẹn dựa trên hệ thống dữ liệu hành chính quy mô lớn.")
 
-# Tạo form nhập liệu cho cán bộ
+# Tạo form nhập liệu cho cán bộ với 3 cột
 with st.form("predict_form"):
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
         linh_vuc = st.selectbox(
-            "Chọn Lĩnh vực thủ tục:", 
-            options=["HoTich", "DatDai"], 
-            format_func=lambda x: "Hộ tịch / Chứng thực" if x == "HoTich" else "Nhà ở / Đất đai"
+            "1. Lĩnh vực thủ tục:", 
+            options=[
+                'Tư pháp - Hộ tịch', 
+                'Tài nguyên - Môi trường', 
+                'Lao động - Thương binh & Xã hội', 
+                'Xây dựng', 
+                'Kế hoạch - Đầu tư'
+            ]
         )
     with col2:
+        kenh = st.selectbox(
+            "2. Kênh nộp hồ sơ:", 
+            options=['Trực tuyến (DVC)', 'Trực tiếp tại quầy']
+        )
+    with col3:
         thang = st.selectbox(
-            "Thời điểm xử lý:", 
-            options=["BinhThuong", "CaoDiem"],
-            format_func=lambda x: "Tháng thường" if x == "BinhThuong" else "Tháng cao điểm (Lễ/Cuối năm)"
+            "3. Tháng tiếp nhận:", 
+            options=[i for i in range(1, 13)],
+            format_func=lambda x: f"Tháng {x}"
         )
     
-    submitted = st.form_submit_button("Tiến hành Chẩn đoán")
+    submitted = st.form_submit_button("Tiến hành Chẩn đoán bằng AI")
 
 if submitted:
-    prob = predict_overload(linh_vuc, thang)
+    prob = predict_overload(linh_vuc, kenh, thang)
     percentage = prob * 100
     
     st.markdown("---")
     st.subheader("📊 Kết quả dự báo:")
     
-    # Giao diện cảnh báo theo mức độ phần trăm
     if percentage > 70:
         st.error(f"⚠️ Nguy cơ quá tải cực cao: {percentage:.1f}%")
-        st.write("**Khuyến nghị:** Đề nghị Lãnh đạo điều động thêm ít nhất 01 nhân sự tăng cường cho quầy giải quyết lĩnh vực này.")
+        st.write("**Khuyến nghị:** Đề nghị Lãnh đạo điều động thêm nhân sự. Nếu là hồ sơ nộp trực tiếp, cần ưu tiên hướng dẫn người dân tạo tài khoản nộp trực tuyến để giảm tải quy trình giấy.")
     elif percentage > 40:
         st.warning(f"⚡ Nguy cơ chậm trễ trung bình: {percentage:.1f}%")
-        st.write("**Khuyến nghị:** Theo dõi sát sao tiến độ luân chuyển hồ sơ nội bộ.")
+        st.write("**Khuyến nghị:** Theo dõi sát sao tiến độ luân chuyển hồ sơ nội bộ, đặc biệt là sự phối hợp giữa bộ phận Một cửa và bộ phận chuyên môn.")
     else:
         st.success(f"✅ An toàn - Tỷ lệ quá tải thấp: {percentage:.1f}%")
         st.write("**Đánh giá:** Nguồn lực hiện tại đang đáp ứng tốt nhu cầu của người dân.")

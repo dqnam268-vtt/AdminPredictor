@@ -3,44 +3,55 @@ from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
 
 def build_model():
-    # 1. Khởi tạo cấu trúc mạng: Lĩnh vực & Tháng ảnh hưởng trực tiếp đến tình trạng Quá tải
-    model = BayesianNetwork([('LinhVuc', 'QuaTai'), ('Thang', 'QuaTai')])
+    # Thêm biến 'Kenh' (Kênh tiếp nhận) vào mạng lưới để phân tích sâu hơn
+    model = BayesianNetwork([('LinhVuc', 'QuaTai'), ('Kenh', 'QuaTai'), ('Thang', 'QuaTai')])
 
-    # 2. Thiết lập xác suất tiên nghiệm (Prior Probabilities)
-    # Giả sử: 70% hồ sơ là Hộ tịch, 30% là Đất đai
+    # 1. Nhóm Lĩnh vực: Phân loại thành Cơ bản (Hộ tịch, LĐTBXH, KHĐT) và Phức tạp (Tài nguyên, Xây dựng)
     cpd_linhvuc = TabularCPD(variable='LinhVuc', variable_card=2, 
-                             values=[[0.7], [0.3]], 
-                             state_names={'LinhVuc': ['HoTich', 'DatDai']})
+                             values=[[0.65], [0.35]], 
+                             state_names={'LinhVuc': ['CoBan', 'PhucTap']})
     
-    # Giả sử: 60% là tháng bình thường, 40% là tháng cao điểm
+    # 2. Nhóm Kênh nộp: Trực tuyến và Trực tiếp
+    cpd_kenh = TabularCPD(variable='Kenh', variable_card=2, 
+                          values=[[0.6], [0.4]], 
+                          state_names={'Kenh': ['TrucTuyen', 'TrucTiep']})
+
+    # 3. Nhóm Tháng: Bình thường và Cao điểm (Lễ/Tết)
     cpd_thang = TabularCPD(variable='Thang', variable_card=2, 
-                           values=[[0.6], [0.4]], 
+                           values=[[0.58], [0.42]], 
                            state_names={'Thang': ['BinhThuong', 'CaoDiem']})
 
-    # 3. Bảng xác suất có điều kiện (CPD) cho biến "QuaTai"
-    # Dữ liệu giả lập tỷ lệ ách tắc dựa trên sự kết hợp của Lĩnh vực và Tháng
+    # 4. Bảng Xác suất có điều kiện (CPD) kết hợp 3 biến số đầu vào
     cpd_quatai = TabularCPD(
         variable='QuaTai', variable_card=2,
         values=[
-            [0.9, 0.6, 0.5, 0.1], # Xác suất KHÔNG bị ách tắc (Bình thường)
-            [0.1, 0.4, 0.5, 0.9]  # Xác suất CÓ bị ách tắc (Quá tải)
+            # Xác suất KHÔNG trễ hẹn (Tỷ lệ nghịch với độ khó)
+            [0.95, 0.75, 0.80, 0.60, 0.65, 0.45, 0.50, 0.10],
+            # Xác suất CÓ trễ hẹn
+            [0.05, 0.25, 0.20, 0.40, 0.35, 0.55, 0.50, 0.90]
         ],
-        evidence=['LinhVuc', 'Thang'],
-        evidence_card=[2, 2],
+        evidence=['LinhVuc', 'Kenh', 'Thang'],
+        evidence_card=[2, 2, 2],
         state_names={
             'QuaTai': ['Khong', 'Co'], 
-            'LinhVuc': ['HoTich', 'DatDai'], 
+            'LinhVuc': ['CoBan', 'PhucTap'], 
+            'Kenh': ['TrucTuyen', 'TrucTiep'],
             'Thang': ['BinhThuong', 'CaoDiem']
         }
     )
 
-    model.add_cpds(cpd_linhvuc, cpd_thang, cpd_quatai)
-    model.check_model() # Kiểm tra tính hợp lệ của mô hình
+    model.add_cpds(cpd_linhvuc, cpd_kenh, cpd_thang, cpd_quatai)
+    model.check_model()
     return model
 
-def predict_overload(linh_vuc, thang):
+def predict_overload(linh_vuc_raw, kenh_raw, thang_raw):
+    # Ánh xạ dữ liệu thực tế từ UI vào các nhóm của thuật toán Bayes
+    linh_vuc = 'PhucTap' if linh_vuc_raw in ['Tài nguyên - Môi trường', 'Xây dựng'] else 'CoBan'
+    kenh = 'TrucTiep' if kenh_raw == 'Trực tiếp tại quầy' else 'TrucTuyen'
+    thang = 'CaoDiem' if thang_raw in [2, 3, 10, 11, 12] else 'BinhThuong'
+
     model = build_model()
     infer = VariableElimination(model)
-    # Thực hiện truy vấn để lấy xác suất xảy ra tình trạng "Có" quá tải
-    result = infer.query(variables=['QuaTai'], evidence={'LinhVuc': linh_vuc, 'Thang': thang})
-    return result.values[1] # Trả về giá trị tỷ lệ %
+    result = infer.query(variables=['QuaTai'], evidence={'LinhVuc': linh_vuc, 'Kenh': kenh, 'Thang': thang})
+    
+    return result.values[1] # Trả về % tỷ lệ trễ hẹn (Quá tải = Có)
